@@ -327,11 +327,70 @@ def select_targets(config: dict) -> list[str]:
     return always + [chosen]
 
 
+HEARTBEAT_FILE = STATE_DIR / "_heartbeat.json"
+
+
+def _load_last_heartbeat() -> datetime | None:
+    try:
+        with HEARTBEAT_FILE.open(encoding="utf-8") as fh:
+            ts = json.load(fh).get("last")
+        return datetime.fromisoformat(ts) if ts else None
+    except Exception:  # noqa: BLE001 — file belum ada / rusak
+        return None
+
+
+def _save_last_heartbeat(now: datetime) -> None:
+    STATE_DIR.mkdir(exist_ok=True)
+    with HEARTBEAT_FILE.open("w", encoding="utf-8") as fh:
+        json.dump({"last": now.isoformat()}, fh)
+
+
+def _account_counts(config: dict) -> list[tuple[str, str]]:
+    accounts = list(config.get("targets", [])) + list(config.get("rotate_targets", []))
+    rows = []
+    for sn in accounts:
+        snap = load_snapshot(sn)
+        rows.append((sn, str(len(snap["following"])) if snap else "—"))
+    return rows
+
+
+def maybe_send_heartbeat(config: dict) -> None:
+    """Kirim ping 'masih hidup' ke Discord tiap heartbeat_hours jam."""
+    hours = config.get("heartbeat_hours", 12)
+    if not hours or hours <= 0:
+        return  # fitur dimatikan
+    now = datetime.now(timezone.utc)
+    last = _load_last_heartbeat()
+    if last is not None and (now - last).total_seconds() < hours * 3600:
+        return  # belum waktunya
+
+    webhook = config.get("heartbeat_webhook") or config.get("discord_webhook")
+    fields = [
+        {"name": f"@{sn}", "value": f"{cnt} following", "inline": True}
+        for sn, cnt in _account_counts(config)
+    ]
+    embed = {
+        "color": 0x2ECC71,
+        "title": "🟢 x-tracker aktif",
+        "description": (
+            f"Bot berjalan normal. Pesan ini dikirim tiap ~{hours} jam.\n"
+            "Kalau berhenti muncul, kemungkinan bot mati — cek tab Actions di GitHub."
+        ),
+        "fields": fields,
+        "footer": {"text": "Pengecekan terakhir (UTC)"},
+        "timestamp": now.isoformat(),
+    }
+    log("Mengirim heartbeat ke Discord.")
+    post_discord(webhook, {"embeds": [embed]})
+    _save_last_heartbeat(now)
+
+
 async def run_once(config: dict) -> None:
     client = await login(config)
     for screen_name in select_targets(config):
         await check_target(client, config, screen_name)
         await asyncio.sleep(PAGE_DELAY_SECONDS)
+    maybe_send_heartbeat(config)
 
 
 async def run_loop(config: dict) -> None:

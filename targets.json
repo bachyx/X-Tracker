@@ -1,5 +1,6 @@
 {
   "targets": ["bachyx", "GuarEmperor"],
   "rotate_targets": ["Tma_420", "CrypSaf"],
-  "notify_on_first_run": false
+  "notify_on_first_run": false,
+  "heartbeat_hours": 12
 }
