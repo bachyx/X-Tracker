@@ -1,0 +1,21 @@
+[Unit]
+Description=x-tracker — pantau following akun X dan kirim notif Discord
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Sesuaikan path & user kalau di server lokasinya berbeda:
+WorkingDirectory=/home/userland/x-tracker
+ExecStart=/home/userland/x-tracker/.venv/bin/python /home/userland/x-tracker/tracker.py
+Restart=always
+RestartSec=30
+# Batasi spam restart kalau gagal terus:
+StartLimitIntervalSec=300
+StartLimitBurst=5
+# Log ikut ke journald (lihat: journalctl -u x-tracker -f)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+# Rahasia — JANGAN pernah di-commit (cookie & webhook ada di sini).
+config.json
+cookies.json
+
+# Log & artefak lokal
+tracker.log
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Catatan: folder state/ SENGAJA tidak diabaikan — di GitHub Actions snapshot
+# following disimpan dengan cara di-commit ke repo agar persisten antar-run.
+# (Berisi data following yang sifatnya publik, bukan rahasia.)

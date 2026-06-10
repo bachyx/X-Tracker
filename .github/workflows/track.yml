@@ -1,0 +1,53 @@
+name: x-tracker
+
+# Jalan terjadwal + bisa dipicu manual dari tab Actions.
+on:
+  schedule:
+    # Tiap ~30 menit (menit 17 & 47 untuk hindari jam-bulat yang padat).
+    # Catatan: jadwal GitHub bersifat best-effort, sering molor 5-15 menit.
+    - cron: "17,47 * * * *"
+  workflow_dispatch: {}
+
+# Izin menulis agar bisa commit snapshot (folder state/) kembali ke repo.
+permissions:
+  contents: write
+
+# Cegah dua run berjalan bersamaan (hindari konflik commit).
+concurrency:
+  group: x-tracker
+  cancel-in-progress: false
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (termasuk snapshot state/ sebelumnya)
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Jalankan tracker (sekali)
+        env:
+          X_AUTH_TOKEN: ${{ secrets.X_AUTH_TOKEN }}
+          X_CT0: ${{ secrets.X_CT0 }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: python tracker.py --once
+
+      - name: Commit snapshot terbaru
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan snapshot."
+          else
+            git commit -m "chore: update snapshot following [skip ci]"
+            git push
+          fi
