@@ -38,6 +38,8 @@ jobs:
           X_AUTH_TOKEN: ${{ secrets.X_AUTH_TOKEN }}
           X_CT0: ${{ secrets.X_CT0 }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          HEARTBEAT_WEBHOOK: ${{ secrets.HEARTBEAT_WEBHOOK }}
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
         run: python tracker.py --once
 
       - name: Commit snapshot terbaru

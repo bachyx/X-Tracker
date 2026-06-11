@@ -70,6 +70,10 @@ def load_config() -> dict:
         config["cookies"]["ct0"] = os.environ["X_CT0"]
     if os.environ.get("DISCORD_WEBHOOK"):
         config["discord_webhook"] = os.environ["DISCORD_WEBHOOK"]
+    if os.environ.get("HEARTBEAT_WEBHOOK"):
+        config["heartbeat_webhook"] = os.environ["HEARTBEAT_WEBHOOK"]
+    if os.environ.get("HEALTHCHECK_URL"):
+        config["healthcheck_url"] = os.environ["HEALTHCHECK_URL"]
 
     if not config.get("targets") and not config.get("rotate_targets"):
         log("Tidak ada target. Isi config.json atau targets.json.")
@@ -385,12 +389,34 @@ def maybe_send_heartbeat(config: dict) -> None:
     _save_last_heartbeat(now)
 
 
+def ping_healthcheck(url: str | None, suffix: str = "") -> None:
+    """Ping healthchecks.io (dead-man switch). Gagal ping tidak boleh ganggu bot."""
+    if not url:
+        return
+    try:
+        req = urllib.request.Request(
+            url.rstrip("/") + suffix, headers={"User-Agent": "x-tracker/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            resp.read()
+    except Exception as exc:  # noqa: BLE001
+        log(f"Gagal ping healthcheck: {exc}")
+
+
 async def run_once(config: dict) -> None:
-    client = await login(config)
-    for screen_name in select_targets(config):
-        await check_target(client, config, screen_name)
-        await asyncio.sleep(PAGE_DELAY_SECONDS)
-    maybe_send_heartbeat(config)
+    hc_url = config.get("healthcheck_url")
+    try:
+        client = await login(config)
+        for screen_name in select_targets(config):
+            await check_target(client, config, screen_name)
+            await asyncio.sleep(PAGE_DELAY_SECONDS)
+        maybe_send_heartbeat(config)
+    except Exception:
+        # Beri tahu healthchecks bahwa run ini GAGAL → memicu alert lebih cepat.
+        ping_healthcheck(hc_url, "/fail")
+        raise
+    # Run sukses → ping. Kalau ping berhenti muncul, healthchecks kirim alarm.
+    ping_healthcheck(hc_url)
 
 
 async def run_loop(config: dict) -> None:
