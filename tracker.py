@@ -21,6 +21,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 from twikit import Client
 from twikit.errors import TwitterException, TooManyRequests
 
@@ -210,12 +211,19 @@ async def fetch_following(client: Client, screen_name: str) -> tuple[dict[str, d
     Tarik seluruh daftar following sebuah akun, dipaginasi sampai habis.
 
     Mengembalikan (following, complete). complete=False bila pengambilan
-    terputus (rate-limit / error / kena batas MAX_PAGES) sehingga daftarnya
+    terputus (rate-limit / timeout jaringan / error) sehingga daftarnya
     kemungkinan tidak utuh — pemanggil harus mengabaikan hasil parsial ini
     agar tidak menghasilkan notifikasi follow/unfollow palsu.
     """
-    user = await client.get_user_by_screen_name(screen_name)
-    result = await user.get_following(count=PAGE_SIZE)
+    # Error jaringan yang boleh dipulihkan (bukan kesalahan logika).
+    NET_ERRORS = (httpx.HTTPError, TwitterException)
+
+    try:
+        user = await client.get_user_by_screen_name(screen_name)
+        result = await user.get_following(count=PAGE_SIZE)
+    except NET_ERRORS as exc:
+        log(f"  gagal mulai ambil @{screen_name}: {type(exc).__name__}: {exc}")
+        return {}, False
 
     following: dict[str, dict] = {}
     pages = 0
@@ -232,13 +240,22 @@ async def fetch_following(client: Client, screen_name: str) -> tuple[dict[str, d
             complete = True  # habis secara wajar
             break
         await asyncio.sleep(PAGE_DELAY_SECONDS)
+
+        # Ambil halaman berikutnya, dengan 1x retry untuk timeout transient.
         try:
-            result = await result.next()
+            try:
+                result = await result.next()
+            except TooManyRequests:
+                raise
+            except httpx.HTTPError as exc:
+                log(f"  timeout/jaringan @{screen_name} hal {pages} ({type(exc).__name__}), retry...")
+                await asyncio.sleep(5)
+                result = await result.next()
         except TooManyRequests:
             log(f"  rate-limit X saat ambil @{screen_name} di halaman {pages}.")
             break
-        except TwitterException as exc:
-            log(f"  error saat paginasi @{screen_name}: {exc}")
+        except NET_ERRORS as exc:
+            log(f"  error paginasi @{screen_name}: {type(exc).__name__}: {exc}")
             break
         if not result:
             complete = True  # halaman kosong = sudah habis
@@ -256,8 +273,8 @@ async def check_target(client: Client, config: dict, screen_name: str) -> None:
     log(f"Mengecek @{screen_name} ...")
     try:
         current, complete = await fetch_following(client, screen_name)
-    except TwitterException as exc:
-        log(f"Gagal ambil following @{screen_name}: {exc}")
+    except Exception as exc:  # noqa: BLE001 — satu akun error tak boleh menjatuhkan run
+        log(f"Gagal ambil following @{screen_name}: {type(exc).__name__}: {exc}")
         return
 
     # Pengambilan tidak utuh (rate-limit dll). Jangan simpan & jangan bandingkan,
