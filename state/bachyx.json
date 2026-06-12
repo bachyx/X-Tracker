@@ -1,6 +1,16 @@
 {
-  "captured_at": "2026-06-12T11:53:53.381909+00:00",
+  "captured_at": "2026-06-12T19:33:24.961001+00:00",
   "following": {
+    "886607772732805121": {
+      "screen_name": "perorossi211",
+      "name": "Ross",
+      "avatar": "https://pbs.twimg.com/profile_images/2030693193675608064/kHLpvqOx_normal.jpg"
+    },
+    "2045187474809315329": {
+      "screen_name": "PixonaOrg",
+      "name": "Pixona",
+      "avatar": "https://pbs.twimg.com/profile_images/2045188059495313408/QgxCsZ0i_normal.jpg"
+    },
     "1790421875719315456": {
       "screen_name": "lysosomething",
       "name": "Lysosome",
@@ -585,11 +595,6 @@
       "screen_name": "lil_defi",
       "name": "Defi",
       "avatar": "https://pbs.twimg.com/profile_images/2065014055757041664/rLW-X7sH_normal.jpg"
-    },
-    "2044122903168299009": {
-      "screen_name": "aqualumi_eth",
-      "name": "Lumi",
-      "avatar": "https://pbs.twimg.com/profile_images/2044123965937815552/7sn-Ms7Y_normal.jpg"
     },
     "1760837336047255552": {
       "screen_name": "JotaJota",
